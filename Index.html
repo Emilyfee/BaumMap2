@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <title>Trees</title>
+    <meta property="og:description" content="Visualize earthquake frequency by location using a heatmap layer." />
+    <meta charset='utf-8'>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel='stylesheet' href='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.css' />
+    <script src='https://unpkg.com/maplibre-gl@3.3.1/dist/maplibre-gl.js'></script>
+    <script src='https://unpkg.com/@turf/turf@6/turf.min.js'></script>
+    <script src="data.js"></script>
+    <!-- <script src="Baumdaten_Polygon.js"></script> -->
+    <style>
+        body { margin: 0; padding: 0; 
+        font-family: 'Roboto', sans-serif;
+        text-align:center;}
+        html, body, #map { height: 100%; 
+        }
+
+        #map{
+          text-align: center;
+        }
+        h1 {color: black;
+            font-weight: 200;
+            font-size: 32px;
+            z-index: 10002;
+            position: absolute;
+            text-align: center;
+            padding-left: 35%;
+            padding-top: 500;
+            vertical-align: middle;
+            letter-spacing: 3px;
+            
+          }
+          #Popup {
+            text-align: left;
+            font-family: 'Roboto', sans-serif;
+            font-weight: 200;
+            margin-top: 5%;
+            width: 200px;
+            font-size: 25;
+
+          }
+          .PopupDivs {
+            margin: 5%;
+
+          }
+
+          #fit {
+            z-index: 100001;
+            position: absolute;
+            text-align: center;
+            bottom: 2%;
+            right: 0%;
+            vertical-align: right;
+            transform: translate(-15%, -50%);
+            border-radius: 20px;
+            border-width: 1px;
+            border-style: solid;
+            border-color: rgb(50, 50, 50);
+            padding: 10px;
+            width: 95px;
+            font-weight: 100;
+
+          }
+
+          #info {
+            z-index: 100001;
+            position: absolute;
+            text-align: center;
+            bottom: 2%;
+            left: 2%;
+            vertical-align: left;
+            transform: translateX(19%);
+            transform: translateY(-50%);
+            border-radius: 20px;
+            border-width: 1px;
+            border-style: solid;
+            border-color: rgb(50, 50, 50);
+            padding: 10px;
+            width: 95px;
+            font-weight: 100;
+            font-size: 16px;
+
+          }
+
+          /* #divText {
+            z-index: 100001;
+            position: absolute;
+            width: 200px;
+            height: 100px;
+            bottom: 100px;
+            left: 40px;
+            transform: translate(0%, -50%);
+
+            text-align: left;
+
+          } */
+
+          #legendeBottom {
+            z-index: 100001;
+            position: absolute;
+            width: 530px;
+            height: 208px;
+            /* width: 50%;
+            height: 43%; */
+            bottom: 1%;
+            left: 50%;
+            transform: translate(-50%, 0%);
+
+           
+            background-image: url("file:///Users/emilysteiner/Desktop/IntroCode/legende.png");
+            background-repeat: no-repeat;
+            background-attachment: fixed;
+            background-size: 100% 100%;
+
+          }     
+
+          
+          .maplibregl-popup-content {
+            border-radius: 25px;
+          }
+          .maplibregl-popup-close-button {
+            border-radius: 20px;
+            right: 10px;
+            top: 10px;
+            height: 40px;
+            width: 40px;
+            color: rgb(14, 57, 2);       
+
+          }
+
+         
+    
+      
+    </style>
+</head>
+<body>
+<div id="map">
+  
+  <h1>PUBLIC TREES OF HAMBURG</h1>
+  <b></b>
+    <button id="fit">
+    Reset Map
+  </button>
+
+
+  <button id="info" onclick="showInfo()">
+    Info
+  </button>
+
+
+ 
+
+
+  <div id="legendeBottom">
+   
+    
+  </div>
+
+</div>
+
+<script>
+
+     
+
+      function showInfo() {
+        
+        if (info.style.textAlign === "center") {
+        info.style.textAlign = "left";
+       
+        } else {
+            info.style.textAlign = "center";
+          
+        };
+
+        // if (info.style.transform === `translateX(19%)`) {
+        // info.style.transform = "`translateX(0%)`";
+       
+        // } else {
+        //     info.style.transform = `translateX(19%)`;
+          
+        // };
+
+        if (info.style.transform === `translateY(-50%)`) {
+        info.style.transform = `translateY(-8%)`;
+       
+        } else {
+            info.style.transform = `translateY(-50%)`;
+          
+        };
+
+        
+        if (info.style.padding === "10px") {
+        info.style.padding = "25px";
+       
+        } else {
+            info.style.padding = "10px";
+          
+        };
+        
+        
+        if (info.style.width === '95px') {
+        info.style.width = '300px';
+       
+        } else {
+            info.style.width = '95px';
+          
+        };
+
+    var x = document.getElementById("info");
+        if (x.innerHTML === "Info") {
+          x.innerHTML = `This map gives an overview of every tree on a public street in Hamburg. 
+
+          Which streets are especially green?
+          Can you find the oldest trees? <br>They were planted in 1720.<br>
+          Click on a single tree and get information about its age and size. <br><br>
+          <i>
+          Data source: <br>
+          Straßenbaumkataster Hamburg </i>`;
+        } else {
+          x.innerHTML = "Info";
+        }
+      }
+
+
+    const bounds = [
+            [8.365882289305107,52.98598084116348], // Southwest coordinates
+            [11.54631984326489,54.13459224536018] // Northeast coordinates
+        ];
+
+    const map = new maplibregl.Map({
+        container: 'map',
+        style:
+            'https://api.maptiler.com/maps/2ed445c1-0333-4685-95c5-30e2d0df40fa/style.json?key=ZvGtdOtN1Ska0MV0BeFq',
+        center: [9.9952286699422, 53.5445075326402],
+        zoom: 9,
+        maxBounds: bounds
+
+    });
+
+    document.getElementById('fit').addEventListener('click', () => {
+        map.fitBounds([
+            [8.365882289305107,52.98598084116348],
+            [11.54631984326489,54.13459224536018]
+        ]).setPitch(0).setZoom(9).setCenter([9.9952286699422, 53.5445075326402]).setBearing(0);
+
+      
+    });
+
+    
+
+    // document.getElementById('fit').addEventListener('click', () => {
+    //     map.reset([
+    //         [8.365882289305107,52.98598084116348],
+    //         [11.54631984326489,54.13459224536018]
+    //     ]);
+    // });
+
+   
+
+
+    // const dataCopy = data.features.map(item => {
+
+    //   var point = turf.point([-90.548630, 14.616599]);
+    //   var buffered = turf.buffer(point, 0.000225, {units: 'kilometers', steps: 1});
+
+    //   item.geometry.type = "Polygon";
+    //   item.geometry.coordinates = buffered.geometry.coordinates;
+
+    //   return item;
+    // })
+
+    //   console.log(JSON.stringify(data))
+
+  
+    map.on('load', () => {
+        // Add a geojson point source.
+        // Heatmap layers also work with a vector tile source.
+        map.addSource('data', {
+            'type': 'geojson',
+            'data': data
+        });
+
+        // map.addSource('dataPolygon', {
+        //     'type': 'geojson',
+        //     'data': dataPolygon
+        // });
+
+        // map.addLayer({
+        //     "id": "test",
+        //     "source": "dataPolygon",
+        //     "type": "fill"
+        // })
+
+    //    // console.log(data.features[10].properties.pflanzjahr);
+
+        map.addLayer(
+            {
+                'id': 'earthquakes-heat',
+                'type': 'heatmap',
+                'source': 'data',
+                'maxzoom': 20,
+                'paint': {
+                    // Increase the heatmap weight based on frequency and property magnitude
+                    'heatmap-weight': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'kronendurchmesser'],
+                        0,
+                        0,
+                        6,
+                        0.5
+                    ],
+                    // Increase the heatmap color weight weight by zoom level
+                    // heatmap-intensity is a multiplier on top of heatmap-weight
+                    'heatmap-intensity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        0,
+                        1,
+                        9,
+                        1.5
+                    ],
+                    // Color ramp for heatmap.  Domain is 0 (low) to 1 (high).
+                    // Begin color ramp at 0-stop with a 0-transparancy color
+                    // to create a blur-like effect.
+                    'heatmap-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['heatmap-density'],
+                        0,
+                        'rgba(33,102,172,0)',
+                        // 0.1,
+                        // 'rgba(128,181,5,0.5)',
+                        // 0.3,
+                        // 'rgba(128,181,5,1)',
+                        // 0.5,
+                        // 'rgba(128,181,5,1)',
+                        // 0.7,
+                        // 'rgba(128,181,5,1)',
+                        1,
+                        'rgb(121,166,17)'
+                    ],
+                    // Adjust the heatmap radius by zoom level
+                    'heatmap-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        9,
+                        5,
+                        10,
+                        7,
+                        14,
+                        40
+                    ],
+                    // Transition from heatmap to circle layer by zoom level
+                    'heatmap-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        8.9,
+                        0.5,
+                        9,
+                        0.75,
+                        20,
+                        0
+                    ]
+                }
+            }
+        );
+        map.addLayer(
+            {
+                'id': 'earthquakes-point-outline',
+                'type': 'circle',
+                'source': 'data',
+                'minzoom': 9,
+                'paint': {
+                    // Size circle radius by earthquake magnitude and zoom level
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        12,
+                        ['interpolate', ['linear'], ['get', 'kronendurchmesser'], 0.6, 0.7, 1.8, 3],
+                        16.5,
+                        ['interpolate', ['linear'], ['get', 'kronendurchmesser'], 5, 5.5, 13, 20],
+                        18.75,
+                        ['interpolate', ['linear'], ['get', 'kronendurchmesser'], 10, 11, 45, 100]
+                    ],
+                    // Color circle by earthquake magnitude
+                    'circle-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'pflanzjahr'],
+                        0,
+                        'rgba(200,200,200,0.5)',
+                        1719,
+                        'rgba(200,200,200,0.5)',
+                        1720,
+                        'rgba(46,99,6,0.5)',
+                        // 1850,
+                        // 'rgba(74,118,50,0.5)',
+                        // 1978,
+                        // 'rgba(102,138,58,0.5)',
+                        // 1992,
+                        // 'rgba(131,160,68,0.5)',
+                        // 2006,
+                        // 'rgba(161,185,81,0.5)',
+                        2022,
+                        'rgba(193,213,96,0.5)'
+                        ],
+                    'circle-stroke-color': 'white',
+                    'circle-stroke-width': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        13,
+                        0.2,
+                        14,
+                        0.8
+                    ],
+                    // Transition from heatmap to circle layer by zoom level
+                    'circle-stroke-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        13,
+                        0,
+                        15,
+                        1
+                    ],
+                    'circle-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        9,
+                        0,
+                        15,
+                        1
+                    ]
+                }
+            }
+        );
+
+        map.addLayer(
+            {
+                'id': 'earthquakes-point',
+                'type': 'circle',
+                'source': 'data',
+                'minzoom': 6,
+                'paint': {
+                    // Size circle radius by earthquake magnitude and zoom level
+                    'circle-radius': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        9,
+                        ['interpolate', ['linear'], ['get', 'stammumfang'], 0, 0, 750, 5, 1000, 5.01],
+                        15.5,
+                        ['interpolate', ['linear'], ['get', 'stammumfang'], 0, 0, 750, 15, 1000, 5.01]
+                    ],
+                    // Color circle by earthquake magnitude
+                    'circle-color': [
+                        'interpolate',
+                        ['linear'],
+                        ['get', 'pflanzjahr'],
+                         0,
+                        'rgb(200,200,200)',
+                        1719,
+                        'rgb(200,200,200)',
+                        1720,
+                        'rgb(26,56,3)',
+                        1978,
+                        'rgb(102,138,58)',
+                        1992,
+                        'rgb(131,160,68)',
+                        2006,
+                        'rgb(161,185,81)',
+                        2022,
+                        'rgb(193,213,96)'
+                    ],
+                    'circle-stroke-color': 'white',
+                    'circle-stroke-width': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        13,
+                        0.2,
+                        14,
+                        0.8
+                    ],
+                    // Transition from heatmap to circle layer by zoom level
+                    'circle-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        6,
+                        0.3,
+                        12,
+                        1
+                    ],
+                    'circle-stroke-opacity': [
+                        'interpolate',
+                        ['linear'],
+                        ['zoom'],
+                        9,
+                        0,
+                        11,
+                        0
+                    ]
+                }
+            }
+        );
+
+        // map.addLayer({
+        //     'id': 'Tree-extrusion',
+        //     'type': 'fill-extrusion',
+        //     'source': "dataPolygon",
+        //     // 'maxzoom': 18.5,
+        //     'paint': {
+        //         // See the MapLibre Style Specification for details on data expressions.
+        //         // https://maplibre.org/maplibre-style-spec/expressions/
+
+        //         // Get the fill-extrusion-color from the source 'color' property.
+        //         'fill-extrusion-color': "red",
+
+        //         // Get fill-extrusion-height from the source 'height' property.
+        //         'fill-extrusion-height': 100,
+
+        //         // Get fill-extrusion-base from the source 'base_height' property.
+        //         'fill-extrusion-base': 1,
+
+        //         // Make extrusions slightly opaque for see through indoor walls.
+        //         'fill-extrusion-opacity': 1
+        //     }
+        // });
+
+
+
+       
+        map.on("click", "earthquakes-point-outline", function(event){
+          
+          const placeJahr = event.features[0].properties.pflanzjahr;
+          const placeGattung = event.features[0].properties.gattung_deutsch;
+          const placeKronendm = event.features[0].properties.kronendurchmesser;
+          const placeStammu = event.features[0].properties.stammumfang;
+  
+          const popupContent =    `   <div id="Popup">
+                                      <div class="PopupDivs"> <b>Pflanzjahr:</b> ${placeJahr}</div>
+                                      <div class="PopupDivs"> <b>Gattung:</b> ${placeGattung}</div>
+                                      <div class="PopupDivs"> <b>Kronendurchmesser:</b> ${placeKronendm}m</div>
+                                      <div class="PopupDivs"> <b>Stammumfang:</b> ${placeStammu}cm</div>
+                                      </div>
+                                  `;
+  
+  
+          new maplibregl.Popup().setLngLat(event.lngLat).setHTML(popupContent).addTo(map);
+          });
+  
+
+    //     map.setMaxZoom(18.75);
+
+    //   //   map.on('move', () => {
+    //   //   console.log(map.getZoom());
+    //   // })
+
+
+    });
+
+
+</script>
+</body>
+</html>
